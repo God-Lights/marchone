@@ -1,4 +1,4 @@
-import { elapsedToMoving, legDistanceM, legDurationMs, legElapsedMs } from "./movement";
+import { SPEED_KMH, elapsedToMoving, legDistanceM, legElapsedMs } from "./movement";
 import { placeById, type Place } from "./places";
 import { draftToLegs, type RouteDraft } from "./route";
 import type { TravelMode } from "./types";
@@ -38,7 +38,7 @@ export function legTimeline(route: RouteDraft, startedAt: number, timeScale: num
 function legFractionAt(leg: LegTimeline, t: number, timeScale: number): number {
   if (t <= leg.start) return 0;
   if (t >= leg.end) return 1;
-  const moving = legDurationMs({ from: leg.from, to: leg.to, mode: leg.mode });
+  const moving = leg.distanceM / ((SPEED_KMH[leg.mode] * 1000) / 3_600_000);
   if (moving === 0) return 1;
   return Math.min(1, elapsedToMoving((t - leg.start) * timeScale, leg.mode) / moving);
 }

@@ -9,8 +9,10 @@ export interface Leg {
   from: LatLng;
   to: LatLng;
   mode: TravelMode;
-  /** Optional road polyline (cached Directions result). Falls back to great-circle. */
+  /** Optional road polyline (cached Routes API result). Falls back to great-circle. */
   path?: LatLng[];
+  /** Fixed travel distance in meters (e.g. road distance). Overrides path/great-circle length. */
+  distanceM?: number;
 }
 
 export interface Journey {

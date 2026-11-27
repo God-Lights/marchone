@@ -28,6 +28,7 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 export function legDistanceM(leg: Leg): number {
+  if (leg.distanceM !== undefined && leg.distanceM > 0) return leg.distanceM;
   return leg.path && leg.path.length > 1 ? pathLength(leg.path) : haversine(leg.from, leg.to);
 }
 

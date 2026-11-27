@@ -7,3 +7,4 @@ export * from "./route";
 export * from "./journey";
 export * from "./timeline";
 export * from "./quests";
+export * from "./polyline";

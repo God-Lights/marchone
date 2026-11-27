@@ -8,6 +8,11 @@ export interface RouteDraft {
   stops: string[];
   /** modes[i] = mode from stops[i] to stops[i+1]; length = stops.length - 1 */
   modes: TravelMode[];
+  /**
+   * Optional fixed distance per leg in meters (road distance resolved by the server).
+   * null/missing → great-circle. Any edit drops these; the server resolves them again.
+   */
+  distances?: (number | null)[];
 }
 
 export const MAX_STOPS = 50;
@@ -58,7 +63,7 @@ export function moveStop(d: RouteDraft, index: number, delta: -1 | 1): RouteDraf
 export function setMode(d: RouteDraft, legIndex: number, mode: TravelMode): RouteDraft {
   const modes = [...d.modes];
   modes[legIndex] = mode;
-  return { ...d, modes };
+  return { stops: d.stops, modes };
 }
 
 export function draftToLegs(d: RouteDraft): Leg[] {
@@ -67,7 +72,13 @@ export function draftToLegs(d: RouteDraft): Leg[] {
     const a = placeById(d.stops[i]!);
     const b = placeById(d.stops[i + 1]!);
     if (!a || !b) continue;
-    legs.push({ from: { lat: a.lat, lng: a.lng }, to: { lat: b.lat, lng: b.lng }, mode: d.modes[i] ?? defaultModeBetween(a, b) });
+    const distanceM = d.distances?.[i] ?? undefined;
+    legs.push({
+      from: { lat: a.lat, lng: a.lng },
+      to: { lat: b.lat, lng: b.lng },
+      mode: d.modes[i] ?? defaultModeBetween(a, b),
+      ...(distanceM ? { distanceM } : {}),
+    });
   }
   return legs;
 }
@@ -117,9 +128,8 @@ export function summarizeRoute(d: RouteDraft): RouteSummary {
     const from = placeById(d.stops[i]!);
     const to = placeById(d.stops[i + 1]!);
     if (!from || !to) continue;
-    const mode = d.modes[i] ?? defaultModeBetween(from, to);
-    const leg: Leg = { from, to, mode };
-    legs.push({ from, to, mode, distanceM: legDistanceM(leg), movingMs: legDurationMs(leg), elapsedMs: legElapsedMs(leg) });
+    const leg = draftToLegs({ stops: [from.id, to.id], modes: [d.modes[i]!], distances: [d.distances?.[i] ?? null] })[0]!;
+    legs.push({ from, to, mode: leg.mode, distanceM: legDistanceM(leg), movingMs: legDurationMs(leg), elapsedMs: legElapsedMs(leg) });
   }
   return {
     legs,

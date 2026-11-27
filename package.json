@@ -27,6 +27,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.70.2",
     "@cloudflare/workers-types": "^5.20261127.1",
+    "@types/google.maps": "^3.67.0",
     "@types/node": "^22.20.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

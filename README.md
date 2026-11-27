@@ -34,7 +34,12 @@ data/              카탈로그 시드 JSON
 2. `officialgl.com`이 같은 Cloudflare 계정의 존이어야 함 (커스텀 도메인 `marchone.officialgl.com`은 배포 시 자동 생성).
 3. (선택) GitHub Environment `production` 생성 후 승인 규칙 추가.
 4. `BETTER_AUTH_SECRET`(32자 이상 랜덤 문자열)을 GitHub Actions 시크릿에 추가 → 배포 시 Worker 시크릿으로 함께 업로드됨
-5. 시크릿: `npx wrangler secret put GOOGLE_MAPS_SERVER_KEY`
+5. Google 지도(선택): Actions **Secrets** `GOOGLE_MAPS_SERVER_KEY`(Routes API 전용 키), Actions **Variables** `GOOGLE_MAPS_BROWSER_KEY`(Maps JavaScript API, 웹사이트 제한 키). 없으면 직선 거리 + SVG 지도로 동작.
+
+## Google 지도
+- **Routes API(서버)**: 육로 구간(도보·자전거·버스·기차)의 실제 길 거리·경로. KV에 30일 캐시, 실패 시 직선. 출발 시점의 거리를 D1에 고정해 진행 중 위치가 튀지 않음.
+- **Maps JavaScript API(브라우저)**: 여정 지도와 Street View(없는 곳은 위성). 키는 `GET /api/config`로 전달.
+- 로컬 테스트: `.dev.vars`에 `GOOGLE_ROUTES_ENDPOINT`로 Routes API 주소를 바꿀 수 있음.
 
 ## 인증
 Better Auth(D1) — **게스트(익명)로 바로 시작** → **패스키 등록**으로 계정 보존·다른 기기 로그인.

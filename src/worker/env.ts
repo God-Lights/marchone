@@ -6,5 +6,10 @@ export interface Env {
   ASSETS: Fetcher;
   /** Secret (wrangler secret put BETTER_AUTH_SECRET). Required outside localhost. */
   BETTER_AUTH_SECRET?: string;
+  /** Secret: Google Routes API key (server-side only). */
   GOOGLE_MAPS_SERVER_KEY?: string;
+  /** Var: Google Maps JavaScript API key, referrer-restricted, safe to expose to the browser. */
+  GOOGLE_MAPS_BROWSER_KEY?: string;
+  /** Test seam: override the Routes API endpoint (local dev only). */
+  GOOGLE_ROUTES_ENDPOINT?: string;
 }
