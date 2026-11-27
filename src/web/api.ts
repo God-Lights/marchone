@@ -17,8 +17,13 @@ export interface Journey {
 
 export interface Me {
   user: { id: string; name: string; isAnonymous: boolean; homeCurrency: string };
+  /** Signed in through GL Account. */
+  gl: { nickname: string; username: string } | null;
   passkeys: number;
 }
+
+/** Login always starts from a button the user presses; this is that button's target. */
+export const GL_LOGIN_PATH = "/auth/login";
 
 export interface QuestBoardResponse {
   available: Quest[];
@@ -66,5 +71,6 @@ export const api = {
   quests: () => call<QuestBoardResponse>("/api/journeys/current/quests"),
   acceptQuest: (id: string) => call<{ ok: true }>(`/api/journeys/current/quests/${encodeURIComponent(id)}/accept`, { method: "POST" }),
   declineQuest: (id: string) => call<{ ok: true }>(`/api/journeys/current/quests/${encodeURIComponent(id)}/decline`, { method: "POST" }),
+  logout: () => call<{ ok: true }>("/auth/logout", { method: "POST" }),
   abandonJourney: () => call<{ ok: true }>("/api/journeys/current/abandon", { method: "POST" }),
 };

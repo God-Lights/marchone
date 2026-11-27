@@ -28,6 +28,18 @@ export function App() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const me = view.kind === "editor" || view.kind === "journey" ? view.me : null;
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function logout() {
+    try {
+      await api.logout();
+    } finally {
+      setNotice("로그아웃했어요.");
+      setView({ kind: "welcome" }); // stay on the login-button screen; never auto-redirect to GL
+    }
+  }
+
   async function start(route: RouteDraft) {
     const { journey } = await api.startJourney(route);
     if (view.kind === "editor") setView({ kind: "journey", me: view.me, journey });
@@ -36,6 +48,12 @@ export function App() {
   return (
     <main>
       <header>
+        {me && !me.user.isAnonymous && (
+          <div className="account">
+            <span className="muted">{me.gl ? `${me.gl.nickname || me.gl.username} · GL 계정` : me.user.name}</span>
+            <button className="ghost small" onClick={() => void logout()}>로그아웃</button>
+          </div>
+        )}
         <h1>MarchOne</h1>
         <p className="sub">
           {view.kind === "journey" ? "마치의 행진" : view.kind === "editor" ? "마치가 걸어갈 길을 정해 주세요" : "행진으로 세계일주"}
@@ -48,7 +66,7 @@ export function App() {
           <button onClick={() => void load()}>다시 시도</button>
         </section>
       )}
-      {view.kind === "welcome" && <Welcome onSignedIn={() => void load()} />}
+      {view.kind === "welcome" && <Welcome notice={notice} onSignedIn={() => { setNotice(null); void load(); }} />}
       {view.kind === "editor" && <RouteEditor onStart={start} />}
       {view.kind === "journey" && (
         <JourneyView

@@ -4,3 +4,7 @@ BETTER_AUTH_SECRET=
 GOOGLE_MAPS_SERVER_KEY=
 # Optional: Google Maps JavaScript API key (browser, referrer-restricted). Without it, the SVG map is shown.
 GOOGLE_MAPS_BROWSER_KEY=
+# Optional: GL Account service key. Point GL_ACCOUNT_ORIGIN/SERVICE_ORIGIN at a mock for local testing.
+GL_ACCOUNT_KEY=
+# GL_ACCOUNT_ORIGIN=http://127.0.0.1:8789
+# SERVICE_ORIGIN=http://localhost:5173
