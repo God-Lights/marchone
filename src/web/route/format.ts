@@ -1,12 +1,12 @@
 import type { TravelMode } from "@marchone/engine";
 
-export const MODE_META: Record<TravelMode, { icon: string; label: string }> = {
-  walk: { icon: "🚶", label: "도보" },
-  bike: { icon: "🚲", label: "자전거" },
-  bus: { icon: "🚌", label: "버스" },
-  train: { icon: "🚆", label: "기차" },
-  ship: { icon: "⛴️", label: "배" },
-  plane: { icon: "✈️", label: "비행기" },
+export const MODE_META: Record<TravelMode, { icon: string; label: string; phrase: string }> = {
+  walk: { icon: "🚶", label: "도보", phrase: "걸어서" },
+  bike: { icon: "🚲", label: "자전거", phrase: "자전거로" },
+  bus: { icon: "🚌", label: "버스", phrase: "버스로" },
+  train: { icon: "🚆", label: "기차", phrase: "기차로" },
+  ship: { icon: "⛴️", label: "배", phrase: "배로" },
+  plane: { icon: "✈️", label: "비행기", phrase: "비행기로" },
 };
 
 export const MODE_COLOR: Record<TravelMode, string> = {

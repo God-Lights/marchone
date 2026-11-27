@@ -26,8 +26,18 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      # D1/KV/R2 are auto-provisioned by wrangler on first deploy (no IDs in wrangler.jsonc).
-      - name: Deploy Worker
-        run: npx wrangler deploy
+      # Migrate first so new code never runs against an old schema.
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply DB --remote
+      - name: Deploy Worker
+        env:
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+        run: |
+          if [ -n "$BETTER_AUTH_SECRET" ]; then
+            node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify({ BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET }))'
+            npx wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json"
+            rm -f "$RUNNER_TEMP/secrets.json"
+          else
+            echo "::warning::BETTER_AUTH_SECRET is not set as a GitHub secret. Login will fail unless it was set with 'wrangler secret put'."
+            npx wrangler deploy
+          fi

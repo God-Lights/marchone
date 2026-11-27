@@ -2,7 +2,9 @@
   "name": "marchone",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -15,7 +17,9 @@
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
   },
   "dependencies": {
+    "@better-auth/passkey": "^1.7.28",
     "@marchone/engine": "*",
+    "better-auth": "^1.7.28",
     "hono": "^4.13.23",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

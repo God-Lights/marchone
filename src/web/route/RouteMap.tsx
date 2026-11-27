@@ -39,7 +39,7 @@ function fitView(points: LatLng[]) {
 }
 
 /** Lightweight route preview (no map key needed). Google Maps replaces this later. */
-export function RouteMap({ draft, selected }: { draft: RouteDraft; selected: number | null }) {
+export function RouteMap({ draft, selected, position }: { draft: RouteDraft; selected: number | null; position?: LatLng }) {
   const places = draft.stops.map((id) => placeById(id)).filter((p) => p !== undefined);
   const arcs = places.slice(0, -1).map((a, i) => arcPoints(a, places[i + 1]!));
   const v = fitView([...places, ...arcs.flat()]);
@@ -89,6 +89,12 @@ export function RouteMap({ draft, selected }: { draft: RouteDraft; selected: num
           </g>
         );
       })}
+      {position && (
+        <g transform={`translate(${x(position.lng)} ${y(position.lat)})`} aria-label="마치의 현재 위치">
+          <circle r={9 * k} className="map-me-halo" />
+          <circle r={4.5 * k} className="map-me" vectorEffect="non-scaling-stroke" />
+        </g>
+      )}
     </svg>
   );
 }

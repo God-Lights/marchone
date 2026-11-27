@@ -69,3 +69,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .result { display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 8px 12px; }
 .primary { width: 100%; background: var(--accent); color: var(--accent-fg); border-color: var(--accent); padding: 14px; font-weight: 600; border-radius: 14px; }
 @media (max-width: 380px) { .totals dd { font-size: 13px; } }
+
+.map-me { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.map-me-halo { fill: var(--accent); opacity: .25; animation: pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes pulse { 0%, 100% { transform: scale(.7); opacity: .35; } 50% { transform: scale(1.2); opacity: .1; } }
+@media (prefers-reduced-motion: reduce) { .map-me-halo { animation: none; } }
+.lead { margin: 12px 0 8px; line-height: 1.5; }
+.progress { height: 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.progress > div { height: 100%; background: var(--accent); min-width: 4px; }
+.welcome { display: grid; gap: 10px; }
+.welcome .lead { margin-top: 0; }
+.welcome button { width: 100%; padding: 12px; }
+.danger { color: var(--err); width: 100%; }

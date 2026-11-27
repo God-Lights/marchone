@@ -4,6 +4,7 @@ export interface Env {
   ASSETS_BUCKET: R2Bucket;
   AI: Ai;
   ASSETS: Fetcher;
-  // Secrets (wrangler secret put): GOOGLE_MAPS_SERVER_KEY, VAPID_PRIVATE_KEY, ...
+  /** Secret (wrangler secret put BETTER_AUTH_SECRET). Required outside localhost. */
+  BETTER_AUTH_SECRET?: string;
   GOOGLE_MAPS_SERVER_KEY?: string;
 }

@@ -1,24 +1,46 @@
 import { Hono } from "hono";
-import { positionAt, type Journey } from "@marchone/engine";
+import { createMiddleware } from "hono/factory";
+import { createAuth } from "./auth";
+import { journeys } from "./journeys";
+import type { AppEnv, SessionUser } from "./types";
 import type { Env } from "./env";
 
-const app = new Hono<{ Bindings: Env }>();
+const app = new Hono<AppEnv>();
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "marchone", time: Date.now() }));
 
-// Demo: engine runs identically on the server and the client.
-app.get("/api/demo/position", (c) => {
-  const journey: Journey = {
-    startedAt: Date.UTC(2026, 0, 1),
-    timeScale: 1,
-    legs: [
-      { from: { lat: 37.5665, lng: 126.978 }, to: { lat: 35.1796, lng: 129.0756 }, mode: "walk" },
-    ],
-  };
-  return c.json(positionAt(journey, Date.now()));
+// Better Auth handles /api/auth/* (anonymous sign-in, passkeys, sessions).
+app.use("/api/*", async (c, next) => {
+  c.set("auth", createAuth(c.env, c.req.raw));
+  await next();
+});
+app.on(["GET", "POST"], "/api/auth/*", (c) => c.var.auth.handler(c.req.raw));
+
+const requireUser = createMiddleware<AppEnv>(async (c, next) => {
+  const session = await c.var.auth.api.getSession({ headers: c.req.raw.headers });
+  if (!session) return c.json({ error: "로그인이 필요해요." }, 401);
+  c.set("user", session.user as SessionUser);
+  await next();
 });
 
+app.get("/api/me", requireUser, async (c) => {
+  const user = c.var.user;
+  const passkeys = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM passkey WHERE "userId" = ?').bind(user.id).first<{ n: number }>();
+  return c.json({
+    user: { id: user.id, name: user.name, isAnonymous: Boolean(user.isAnonymous), homeCurrency: user.homeCurrency ?? "KRW" },
+    passkeys: passkeys?.n ?? 0,
+  });
+});
+
+app.use("/api/journeys/*", requireUser);
+app.use("/api/journeys", requireUser);
+app.route("/api/journeys", journeys);
+
 app.notFound((c) => c.json({ error: "not_found" }, 404));
+app.onError((err, c) => {
+  console.error(err);
+  return c.json({ error: "서버 오류가 났어요." }, 500);
+});
 
 export default {
   fetch: app.fetch,
