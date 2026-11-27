@@ -21,7 +21,7 @@
 - 구간 추가·삭제·순서변경·수단변경 언제든 가능(미래 구간만).
 
 ### 3.2 실시간 이동 엔진
-- 위치는 **저장하지 않고 계산**: `position = f(startedAt, route, now)`. 앱을 꺼도 진행되고, 서버 틱 불필요.
+- 위치는 **저장하지 않고 계산**(공용 TS 패키지 → 클라이언트 애니메이션·Worker 알림 스케줄링에서 동일 로직 사용): `position = f(startedAt, route, now)`. 앱을 꺼도 진행되고, 서버 틱 불필요.
 - 속도(기본값): 도보 5km/h · 자전거 15 · 버스 50 · 기차 90 · 배 30 · 비행기 800 km/h.
 - 현실감: 도보/자전거는 **하루 이동시간 상한**(기본 8h, 현지 08–18시) → 밤엔 숙박(비용 발생, 힐링 연출).
 - 이동 경로: 육상은 Google Directions, 해상/항공은 대권(great-circle) 보간.
@@ -41,7 +41,7 @@
 - 선물하기(친구/가족 공유 링크) — 후순위.
 
 ### 3.5 Google Maps 연동
-- 현재 위치: **Street View** 파노라마를 메인 화면 배경으로(없는 곳은 Places 사진/위성).
+- 현재 위치: **Street View** 파노라마를 메인 화면 배경으로(브라우저에서 Maps JS API 직접 로드, 키는 리퍼러 제한)(없는 곳은 Places 사진/위성).
 - 미니맵: 전체 루트 + 지나온 길 + 남은 길.
 - 구간 진행 중 일정 거리마다 **"풍경 스냅"** 자동 수집 → 여행 앨범.
 - 비용/약관 대응: 뷰 단위 캐싱 최소화(약관 준수), 호출 수 제한, 정지 시에만 고해상도.
@@ -72,56 +72,111 @@
 5. **Journal** — 엽서·스냅·미식 도감·특산품 도감
 6. **Settings** — 커스터마이징
 
-## 5. 기술 스택 (결정)
+## 5. 아키텍처 — Cloudflare Workers 전용
+
+```
+[PWA: React+Vite]  ──fetch──▶  [Worker: Hono API + Static Assets]
+   Maps JS API(브라우저)            │  ├─ D1   (유저·루트·지출·식사·인벤토리)
+   Web Push 구독                    │  ├─ KV   (환율·물가 캐시, 폴리라인 캐시)
+                                    │  ├─ R2   (음식/특산품 이미지, 엽서)
+                                    │  ├─ Workers AI (엽서 일기 초안)
+                                    │  └─ Cron Triggers (환율 갱신, 알림 발송)
+```
+
 | 영역 | 선택 | 이유 |
 |---|---|---|
-| 클라이언트 | React Native (Expo) + TypeScript | iOS/Android 동시, 푸시·헬스 연동 |
-| 백엔드 | Supabase (Postgres + Auth + Edge Functions) | 서버 틱 불필요, 가볍게 시작 |
-| 지도 | Google Maps Platform (Maps SDK, Street View Static, Directions, Places) | 요구사항 |
-| 환율 | Frankfurter(무료) → 필요 시 유료 | 일 1회 캐시 |
-| 타임존 | `geo-tz` / IANA | 좌표→로컬타임 |
-| 물가 | 자체 큐레이션 JSON (국가별 바스켓) + 환율 | 외부 API 의존 최소화 |
-| 콘텐츠 | 음식·특산품 카탈로그 JSON (시드 20개국 → 확장) | MVP 규모 제어 |
+| 런타임 | Cloudflare Workers 단일 Worker (API + 정적 에셋) | 배포 1개, 엣지 지연 최소 |
+| 프레임워크 | Hono + TypeScript | Workers 표준 경량 라우터 |
+| 프론트 | React + Vite → Workers Static Assets, **PWA** | 앱스토어 없이 설치·푸시(Web Push) |
+| DB | D1 + Drizzle ORM | 관계형 데이터, 서버리스 |
+| 캐시 | KV | 환율(일 1회), 물가표, Directions 결과 |
+| 파일 | R2 | 카탈로그 이미지, 사용자 엽서 |
+| 인증 | Better Auth (D1 어댑터, 이메일 매직링크 + 패스키) | Workers 호환 |
+| 푸시 | Web Push(VAPID) — Worker에서 직접 발송 | 식사창 알림 |
+| 스케줄 | Cron Trigger `*/5 * * * *` | `next_notify_at` 인덱스 스캔 후 발송 |
+| 타임존 | `tz-lookup`(순수 JS, 경량) + `Intl.DateTimeFormat` | `geo-tz`는 번들 과대 → Workers 부적합 |
+| 지도 | Maps JS API(Street View, 지도) / Directions는 Worker에서 호출·캐시 | 키 분리: 브라우저키(리퍼러 제한) vs 서버키(Secret) |
+| AI | Workers AI | 엽서 일기 초안, 문화 카드 보강 |
+| 환율 | Frankfurter → Cron으로 KV 갱신 | 무료, 일 1회 |
+| 배포 | `wrangler` + GitHub Actions | |
 
-## 6. 데이터 모델 (핵심)
+**Durable Objects 미사용(MVP).** 이동 상태가 계산식이라 상태 서버가 필요 없음. 실시간 공유(친구 동행)를 넣을 때 도입.
+
+### 알림 흐름
+1. 구간/식사 변경 시 Worker가 "다음 식사창 시작 시각(UTC)" 계산 → `journey.next_notify_at` 저장.
+2. Cron(5분)이 `next_notify_at <= now` 조회 → Web Push 발송 → 다음 시각 재계산.
+3. 위치→타임존→현지 식사창 변환은 공용 엔진 함수.
+
+### 저장소 구조
 ```
-User(id, homeCurrency, settings)
-Journey(id, userId, startedAt, timeScale, status)
-Leg(id, journeyId, seq, from, to, mode, pace, polyline, distanceM)
-Wallet(journeyId, currency, balance)           -- 통화별 잔액
-Transaction(id, journeyId, ts, type, currency, amount, refId)
-Meal(id, journeyId, ts, localTs, dishId, price)
-Dish(id, country, name, story, etiquette, basePrice, imageUrl)
-Product(id, region, name, story, basePrice, imageUrl)
-Inventory(journeyId, productId, qty, boughtAt)
-Snapshot(id, journeyId, ts, lat, lng, imageUrl, note)
+marchone/
+├─ wrangler.jsonc
+├─ src/worker/        # Hono 라우트, cron, push
+├─ src/web/           # React PWA
+├─ packages/engine/   # 이동·시간·식사창·물가 순수 TS (worker·web 공용)
+├─ data/              # 음식·특산품·물가 시드 JSON
+└─ migrations/        # D1 마이그레이션
 ```
-이동 상태는 DB에 쓰지 않고 `Journey.startedAt + Leg[]`로 즉시 계산.
 
-## 7. MVP 범위 (6~8주)
-- [ ] 루트 에디터(나라/도시 단위, 도보·기차·비행기)
-- [ ] 실시간 이동 엔진 + 로컬타임
-- [ ] Street View 홈 화면 + 미니맵
-- [ ] 환전(실환율) + 물가 지수 10개국
-- [ ] 식사 시스템(식사창·문화 카드) 10개국 × 음식 5종
-- [ ] 특산품 구매·도감 10개국 × 3종
-- [ ] 엽서/일기, 기본 커스터마이징(테마·페이스)
+## 6. 데이터 모델 (D1)
+```
+user(id, home_currency, settings_json)
+journey(id, user_id, started_at, time_scale, status, next_notify_at)
+leg(id, journey_id, seq, from_json, to_json, mode, pace, polyline_key, distance_m)
+wallet(journey_id, currency, balance)
+txn(id, journey_id, ts, type, currency, amount, ref_id)
+meal(id, journey_id, ts_utc, local_ts, dish_id, price)
+dish(id, country, name, story, etiquette, base_price, image_key)
+product(id, region, name, story, base_price, image_key)
+inventory(journey_id, product_id, qty, bought_at)
+snapshot(id, journey_id, ts, lat, lng, note)      -- 이미지 저장 안 함, 좌표 재조회
+push_sub(id, user_id, endpoint, keys_json)
+```
+- 이동 상태는 DB에 쓰지 않고 `started_at + leg[]`로 즉시 계산.
+- 폴리라인은 KV(`poly:{hash(from,to,mode)}`)에 저장해 Directions 호출 최소화.
+- 카탈로그(dish/product/물가)는 `data/*.json`을 시드로 D1에 마이그레이션.
 
-**이후:** 아바타·동행, 걸음수 연동, 소득 이벤트, 친구 루트 공유, 지역 단위 세분 루트, 시즌 이벤트.
+## 7. API (Hono)
+```
+POST /api/journeys                 루트 생성/시작
+GET  /api/journeys/:id/state       현재 위치·로컬시각·다음 이벤트 (엔진 계산)
+PUT  /api/journeys/:id/legs        미래 구간 편집
+POST /api/exchange                 환전
+GET  /api/meals/options            현재 위치 기준 식사 선택지
+POST /api/meals                    식사 기록(+문화 카드)
+GET  /api/market                   특산품 목록(현지가)
+POST /api/market/buy               구매
+POST /api/journal/postcard         엽서 생성(Workers AI)
+POST /api/push/subscribe           푸시 구독
+```
 
-## 8. 리스크
+## 8. MVP 범위 (6~8주)
+- [ ] 레포 스캐폴딩: wrangler, Hono, Vite PWA, D1 마이그레이션
+- [ ] `packages/engine`: 이동·로컬타임·식사창 + 단위테스트
+- [ ] 루트 에디터(나라/도시, 도보·기차·비행기) + Directions 캐시
+- [ ] 홈(Street View + 미니맵 + 로컬시각)
+- [ ] 환전(Cron 환율) + 물가 10개국
+- [ ] 식사 시스템 + Web Push 알림
+- [ ] 특산품 구매·도감
+- [ ] 엽서(Workers AI), 테마·페이스 커스터마이징
+
+**이후:** 아바타·동행(Durable Objects), 걸음수 연동(PWA 한계로 네이티브 래퍼 검토), 소득 이벤트, 루트 공유, 지역 단위 세분 루트.
+
+## 9. 리스크
 | 리스크 | 대응 |
 |---|---|
-| Google Maps 비용 | 호출 캐싱 한도·정지 시에만 고해상도·일일 쿼터 |
+| Google Maps 비용·약관(Directions/Street View 캐싱 제한) | 폴리라인만 KV 캐시, 이미지 미저장, 일일 쿼터, 정지 시에만 고해상도 |
 | Street View 미지원 지역(바다·사막·극지) | Places 사진 / 위성 / 일러스트 폴백 |
+| iOS PWA 푸시 제약(홈 화면 추가 필요) | 온보딩에서 설치 안내, 이메일 알림 폴백 |
+| 걸음수 연동 불가(PWA) | 후순위, 필요 시 Capacitor 래퍼 |
+| Workers 번들/CPU 한도 | 순수 JS 라이브러리만, 무거운 계산은 사전 생성 JSON |
 | 도보 지구 일주 ≈ 3년 | 시간 배율 옵션 + 수단 혼합 루트 권장 |
-| 콘텐츠 제작량 | 국가별 시드 JSON + LLM 초안 생성 후 검수 |
-| 약관(지도 캐싱·스크린샷) | 법무 체크 후 앨범은 좌표 재조회 방식 |
+| 콘텐츠 제작량 | 시드 JSON + LLM 초안 후 검수 |
 | 가격 정확도 | "체감용 지수"로 명시, 출처·기준일 표기 |
 
-## 9. 확정한 설계 결정
-1. 기본 이동수단 **도보**, 하루 8시간 이동 + 숙박.
-2. 기본 시간 **1x 실시간**, 가속은 옵션.
-3. 실패 상태 없음 — 돈 0이어도 계속.
-4. 식사는 권장이지 강제 아님(힐링 우선).
-5. 이동 상태는 **계산식**(서버 틱 없음).
+## 10. 확정한 설계 결정
+1. **Cloudflare Workers 단일 배포**(Hono + Static Assets), 앱은 **PWA**.
+2. 상태 서버 없음 — 이동은 계산식, 알림은 Cron + `next_notify_at`.
+3. D1(관계 데이터) / KV(캐시) / R2(이미지) 역할 분리.
+4. 기본 이동수단 도보, 하루 8시간 이동 + 숙박, 1x 실시간(가속은 옵션).
+5. 실패 상태 없음 — 돈 0이어도 계속. 식사는 권장이지 강제 아님.
