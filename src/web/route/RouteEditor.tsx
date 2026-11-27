@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api, type NextFunds } from "../api";
+import { formatMoney } from "./format";
 import type { RouteDraft } from "@marchone/engine";
 import {
   ALL_MODES, ROUTE_TEMPLATES, addStop, moveStop, normalizeDraft, placeById, removeStop,
@@ -12,6 +14,8 @@ export function RouteEditor({ onStart }: { onStart: (draft: RouteDraft) => Promi
   const [draft, setDraft] = useRouteDraft();
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  const [funds, setFunds] = useState<NextFunds | null>(null);
+  useEffect(() => { api.nextFunds().then(setFunds).catch(() => {}); }, []);
 
   async function start() {
     setStarting(true);
@@ -138,6 +142,12 @@ export function RouteEditor({ onStart }: { onStart: (draft: RouteDraft) => Promi
         </div>
       </section>
 
+      {funds && (
+        <p className="funds">
+          출발 자금 <strong>{formatMoney(funds.total, funds.currency)}</strong>
+          {funds.carry > 0 && <span className="muted"> · 지난 여정 환급 +{formatMoney(funds.carry, funds.currency)}</span>}
+        </p>
+      )}
       {startError && <p className="issue error" role="alert">{startError}</p>}
       <button className="primary" disabled={hasError || draft.stops.length < 2 || starting} onClick={() => void start()}>
         {starting ? "출발 준비 중…" : "이 루트로 출발"}

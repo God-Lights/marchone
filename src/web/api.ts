@@ -1,4 +1,4 @@
-import type { JourneyState, RouteDraft } from "@marchone/engine";
+import type { JourneyState, Quest, QuestProgress, RouteDraft } from "@marchone/engine";
 
 export interface Journey {
   id: string;
@@ -8,6 +8,7 @@ export interface Journey {
   route: RouteDraft;
   traveler: { name: string; level: number; xp: number } | null;
   wallet: { currency: string; balance: number }[];
+  refund: { pending: number };
   state: JourneyState;
   serverTime: number;
 }
@@ -15,6 +16,22 @@ export interface Journey {
 export interface Me {
   user: { id: string; name: string; isAnonymous: boolean; homeCurrency: string };
   passkeys: number;
+}
+
+export interface QuestBoardResponse {
+  available: Quest[];
+  active: (Quest & { progress: QuestProgress; acceptedAt: number })[];
+  completed: (Quest & { completedAt: number })[];
+  pendingRefund: number;
+  maxActive: number;
+}
+
+export interface NextFunds {
+  base: number;
+  carry: number;
+  overflow: number;
+  total: number;
+  currency: string;
 }
 
 export class ApiError extends Error {
@@ -39,5 +56,9 @@ export const api = {
   currentJourney: () => call<{ journey: Journey | null }>("/api/journeys/current"),
   startJourney: (route: RouteDraft, travelerName?: string) =>
     call<{ journey: Journey }>("/api/journeys", { method: "POST", body: JSON.stringify({ route, travelerName }) }),
+  nextFunds: () => call<NextFunds>("/api/journeys/next-funds"),
+  quests: () => call<QuestBoardResponse>("/api/journeys/current/quests"),
+  acceptQuest: (id: string) => call<{ ok: true }>(`/api/journeys/current/quests/${encodeURIComponent(id)}/accept`, { method: "POST" }),
+  declineQuest: (id: string) => call<{ ok: true }>(`/api/journeys/current/quests/${encodeURIComponent(id)}/decline`, { method: "POST" }),
   abandonJourney: () => call<{ ok: true }>("/api/journeys/current/abandon", { method: "POST" }),
 };
