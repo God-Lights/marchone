@@ -36,3 +36,7 @@ export function formatDuration(ms: number): string {
 export function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString("ko-KR", { year: "numeric", month: "numeric", day: "numeric" });
 }
+export function formatMoney(amount: number, currency: string): string {
+  if (currency === "KRW") return `₩${Math.round(amount).toLocaleString("ko-KR")}`;
+  return `${Math.round(amount).toLocaleString("ko-KR")} ${currency}`;
+}

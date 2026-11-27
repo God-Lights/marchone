@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { journeyState, localParts } from "@marchone/engine";
 import type { Journey, Me } from "./api";
 import { authClient } from "./auth";
+import { QuestPanel } from "./QuestPanel";
 import { RouteMap } from "./route/RouteMap";
-import { MODE_META, formatDate, formatDuration } from "./route/format";
+import { MODE_META, formatDate, formatDuration, formatMoney } from "./route/format";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -42,7 +43,10 @@ export function JourneyView({
       <section className="card map-card">
         <RouteMap draft={journey.route} selected={s.legIndex} position={s.position} />
         {s.finished ? (
-          <p className="lead">{name}가 {s.to.name}에 도착했어요! 🎉</p>
+          <>
+            <p className="lead">{name}가 {s.to.name}에 도착했어요! 🎉</p>
+            <p className="muted">이룬 부탁의 환급금과 남은 돈이 정산돼 다음 여정 출발 자금에 더해져요.</p>
+          </>
         ) : (
           <p className="lead">
             {name}는 지금 <strong>{s.from.name}</strong> → <strong>{s.to.name}</strong> 구간을{" "}
@@ -59,9 +63,13 @@ export function JourneyView({
         </dl>
         <p className="note">
           구간 {s.legIndex + 1}/{journey.route.modes.length} · 남은 시간 {formatDuration(Math.max(0, s.arrivesAt - now))}
-          {wallet && ` · 지갑 ${Math.round(wallet.balance).toLocaleString("ko-KR")} ${wallet.currency}`}
+          {wallet && ` · 지갑 ${formatMoney(wallet.balance, wallet.currency)}`}
         </p>
       </section>
+
+      {!s.finished && journey.status === "active" && (
+        <QuestPanel currency={me.user.homeCurrency} refreshKey={s.legIndex} />
+      )}
 
       {me.user.isAnonymous && me.passkeys === 0 && (
         <section className="card">

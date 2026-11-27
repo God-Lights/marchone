@@ -81,3 +81,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .welcome .lead { margin-top: 0; }
 .welcome button { width: 100%; padding: 12px; }
 .danger { color: var(--err); width: 100%; }
+
+h3 { margin: 16px 0 8px; font-size: 15px; }
+.refund { margin: 4px 0 12px; }
+.quest-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.quest { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 6px; }
+.quest.active { border-color: var(--accent); }
+.quest .giver { margin: 0; line-height: 1.5; }
+.quest-actions { display: flex; gap: 8px; }
+.quest-actions button { flex: 1; }
+.quest-list.done li { padding: 2px 0; }
+button.small { min-height: 32px; padding: 4px 8px; font-size: 13px; }
+.funds { margin: 4px 0 10px; text-align: center; }
