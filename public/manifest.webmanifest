@@ -1,0 +1,10 @@
+{
+  "name": "MarchOne",
+  "short_name": "MarchOne",
+  "description": "행진으로 세계일주",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f1e8",
+  "theme_color": "#1f3a34",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
