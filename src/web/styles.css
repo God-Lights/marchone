@@ -93,3 +93,11 @@ h3 { margin: 16px 0 8px; font-size: 15px; }
 .quest-list.done li { padding: 2px 0; }
 button.small { min-height: 32px; padding: 4px 8px; font-size: 13px; }
 .funds { margin: 4px 0 10px; text-align: center; }
+
+.gmap { width: 100%; aspect-ratio: 2 / 1; border-radius: 10px; overflow: hidden; background: var(--sea); }
+.gm-me { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 0 0 rgba(47,111,94,.5); animation: gm-pulse 2.4s ease-out infinite; }
+@keyframes gm-pulse { 0% { box-shadow: 0 0 0 0 rgba(47,111,94,.5); } 100% { box-shadow: 0 0 0 16px rgba(47,111,94,0); } }
+@media (prefers-reduced-motion: reduce) { .gm-me { animation: none; } }
+.view-card { padding: 0; overflow: hidden; }
+.view-card .note { padding: 8px 16px 12px; margin: 0; }
+.street { width: 100%; aspect-ratio: 4 / 3; background: var(--sea); }

@@ -9,6 +9,8 @@ export interface Journey {
   traveler: { name: string; level: number; xp: number } | null;
   wallet: { currency: string; balance: number }[];
   refund: { pending: number };
+  /** Encoded road path per leg (null = straight). */
+  paths: (string | null)[];
   state: JourneyState;
   serverTime: number;
 }
@@ -56,6 +58,10 @@ export const api = {
   currentJourney: () => call<{ journey: Journey | null }>("/api/journeys/current"),
   startJourney: (route: RouteDraft, travelerName?: string) =>
     call<{ journey: Journey }>("/api/journeys", { method: "POST", body: JSON.stringify({ route, travelerName }) }),
+  resolveRoute: (route: RouteDraft, signal?: AbortSignal) =>
+    call<{ legs: { distanceM: number; path: string | null; source: "road" | "direct" }[] }>("/api/journeys/resolve", {
+      method: "POST", body: JSON.stringify({ route }), signal,
+    }),
   nextFunds: () => call<NextFunds>("/api/journeys/next-funds"),
   quests: () => call<QuestBoardResponse>("/api/journeys/current/quests"),
   acceptQuest: (id: string) => call<{ ok: true }>(`/api/journeys/current/quests/${encodeURIComponent(id)}/accept`, { method: "POST" }),

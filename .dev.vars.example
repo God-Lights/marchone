@@ -1,3 +1,6 @@
 # Optional locally (a dev secret is used on localhost). Required in production.
 BETTER_AUTH_SECRET=
+# Optional: Google Routes API key (server). Without it, legs use straight-line distance.
 GOOGLE_MAPS_SERVER_KEY=
+# Optional: Google Maps JavaScript API key (browser, referrer-restricted). Without it, the SVG map is shown.
+GOOGLE_MAPS_BROWSER_KEY=

@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
-import { journeyState, localParts } from "@marchone/engine";
+import { useEffect, useMemo, useState } from "react";
+import { decodePolyline, journeyState, localParts, pointAlong } from "@marchone/engine";
 import type { Journey, Me } from "./api";
 import { authClient } from "./auth";
 import { QuestPanel } from "./QuestPanel";
-import { RouteMap } from "./route/RouteMap";
+import { JourneyMap } from "./maps/JourneyMap";
+import { StreetView } from "./maps/StreetView";
 import { MODE_META, formatDate, formatDuration, formatMoney } from "./route/format";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -26,6 +27,10 @@ export function JourneyView({
   }, [offset]);
 
   const s = journeyState(journey.route, journey.startedAt, journey.timeScale, now);
+  // On road legs Machi walks the actual road: same progress, placed along the decoded path.
+  const decoded = useMemo(() => (journey.paths ?? []).map((p) => (p ? decodePolyline(p) : null)), [journey.paths]);
+  const roadPath = decoded[s.legIndex];
+  const position = roadPath && !s.finished ? pointAlong(roadPath, s.position.legProgress) : s.position;
   const local = localParts(now, s.timeZone);
   const name = journey.traveler?.name ?? "마치";
   const wallet = journey.wallet[0];
@@ -40,8 +45,9 @@ export function JourneyView({
 
   return (
     <div className="editor">
+      {!s.finished && <StreetView position={position} toward={s.to} placeName={s.to.name} />}
       <section className="card map-card">
-        <RouteMap draft={journey.route} selected={s.legIndex} position={s.position} />
+        <JourneyMap route={journey.route} paths={journey.paths ?? []} selected={s.legIndex} position={position} />
         {s.finished ? (
           <>
             <p className="lead">{name}가 {s.to.name}에 도착했어요! 🎉</p>

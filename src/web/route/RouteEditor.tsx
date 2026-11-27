@@ -30,7 +30,27 @@ export function RouteEditor({ onStart }: { onStart: (draft: RouteDraft) => Promi
   const [query, setQuery] = useState("");
   const [selectedLeg, setSelectedLeg] = useState<number | null>(null);
 
-  const summary = useMemo(() => summarizeRoute(draft), [draft]);
+  // Road distances from the server (Routes API, cached). Straight-line until they arrive.
+  const [roads, setRoads] = useState<{ for: RouteDraft; distances: (number | null)[]; any: boolean } | null>(null);
+  useEffect(() => {
+    if (draft.stops.length < 2 || validateRoute(draft).some((i) => i.level === "error")) return;
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      api.resolveRoute(draft, ctl.signal)
+        .then(({ legs }) => setRoads({
+          for: draft,
+          distances: legs.map((l) => (l.source === "road" ? l.distanceM : null)),
+          any: legs.some((l) => l.source === "road"),
+        }))
+        .catch(() => {});
+    }, 600);
+    return () => { clearTimeout(t); ctl.abort(); };
+  }, [draft]);
+  const roadInfo = roads?.for === draft ? roads : null;
+  const summary = useMemo(
+    () => summarizeRoute(roadInfo ? { ...draft, distances: roadInfo.distances } : draft),
+    [draft, roadInfo],
+  );
   const issues = useMemo(() => validateRoute(draft), [draft]);
   const results = useMemo(() => searchPlaces(query, 8), [query]);
   const hasError = issues.some((i) => i.level === "error");
@@ -46,7 +66,10 @@ export function RouteEditor({ onStart }: { onStart: (draft: RouteDraft) => Promi
           <div><dt>예상 기간</dt><dd>{formatDuration(summary.totalElapsedMs)}</dd></div>
           <div><dt>오늘 출발하면</dt><dd>{summary.legs.length ? formatDate(Date.now() + summary.totalElapsedMs) : "—"}</dd></div>
         </dl>
-        <p className="note">실시간 1배속 기준 · 도보·자전거는 하루 10시간 이동 후 캠프에서 쉬어요 · 거리는 직선(대권) 기준</p>
+        <p className="note">
+          실시간 1배속 기준 · 도보·자전거는 하루 10시간 이동 후 캠프에서 쉬어요 ·{" "}
+          {roadInfo?.any ? "육로는 실제 길 기준, 배·비행기는 직선 거리" : "거리는 직선(대권) 기준"}
+        </p>
       </section>
 
       <section className="card">

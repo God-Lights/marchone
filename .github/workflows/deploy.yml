@@ -32,12 +32,19 @@ jobs:
       - name: Deploy Worker
         env:
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          GOOGLE_MAPS_SERVER_KEY: ${{ secrets.GOOGLE_MAPS_SERVER_KEY }}
+          GOOGLE_MAPS_BROWSER_KEY: ${{ vars.GOOGLE_MAPS_BROWSER_KEY }}
         run: |
-          if [ -n "$BETTER_AUTH_SECRET" ]; then
-            node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify({ BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET }))'
-            npx wrangler deploy --secrets-file "$RUNNER_TEMP/secrets.json"
-            rm -f "$RUNNER_TEMP/secrets.json"
-          else
-            echo "::warning::BETTER_AUTH_SECRET is not set as a GitHub secret. Login will fail unless it was set with 'wrangler secret put'."
-            npx wrangler deploy
-          fi
+          [ -n "$BETTER_AUTH_SECRET" ] || echo "::warning::BETTER_AUTH_SECRET is not set as a GitHub secret. Login fails unless it was set with 'wrangler secret put'."
+          [ -n "$GOOGLE_MAPS_SERVER_KEY" ] || echo "::warning::GOOGLE_MAPS_SERVER_KEY is not set. Routes fall back to straight lines."
+          [ -n "$GOOGLE_MAPS_BROWSER_KEY" ] || echo "::warning::GOOGLE_MAPS_BROWSER_KEY variable is not set. The app shows the SVG map."
+          # Secrets set here are additive: an unset one keeps its previous value on the Worker.
+          node -e '
+            const s = {};
+            for (const k of ["BETTER_AUTH_SECRET", "GOOGLE_MAPS_SERVER_KEY"]) if (process.env[k]) s[k] = process.env[k];
+            require("fs").writeFileSync(process.env.RUNNER_TEMP + "/secrets.json", JSON.stringify(s));
+          '
+          ARGS=(--secrets-file "$RUNNER_TEMP/secrets.json")
+          [ -n "$GOOGLE_MAPS_BROWSER_KEY" ] && ARGS+=(--var "GOOGLE_MAPS_BROWSER_KEY:$GOOGLE_MAPS_BROWSER_KEY")
+          npx wrangler deploy "${ARGS[@]}"
+          rm -f "$RUNNER_TEMP/secrets.json"

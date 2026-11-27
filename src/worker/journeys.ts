@@ -4,6 +4,8 @@ import {
   parseRouteDraft, questAvailable, questBoard, questById, settleRefund,
   type QuestRecord, type RouteDraft, type TravelMode,
 } from "@marchone/engine";
+import { legPath, resolveRoute, type ResolvedLeg } from "./routes";
+import type { Env } from "./env";
 import type { AppEnv } from "./types";
 
 export const DEFAULT_STARTING_FUNDS = 1_000_000;
@@ -17,24 +19,40 @@ interface JourneyRow {
   status: "active" | "finished" | "abandoned";
 }
 
-async function loadRoute(db: D1Database, journeyId: string): Promise<RouteDraft> {
+/** Route with the distances fixed at departure (road distance when resolved, else great-circle). */
+type StoredRoute = RouteDraft & { distances: number[]; road: boolean[] };
+
+async function loadRoute(db: D1Database, journeyId: string): Promise<StoredRoute> {
   const { results } = await db
-    .prepare("SELECT from_place, to_place, mode FROM leg WHERE journey_id = ? ORDER BY seq")
+    .prepare("SELECT from_place, to_place, mode, distance_m, polyline_key FROM leg WHERE journey_id = ? ORDER BY seq")
     .bind(journeyId)
-    .all<{ from_place: string; to_place: string; mode: TravelMode }>();
-  if (results.length === 0) return { stops: [], modes: [] };
+    .all<{ from_place: string; to_place: string; mode: TravelMode; distance_m: number; polyline_key: string | null }>();
+  if (results.length === 0) return { stops: [], modes: [], distances: [], road: [] };
   return {
     stops: [results[0]!.from_place, ...results.map((r) => r.to_place)],
     modes: results.map((r) => r.mode),
+    distances: results.map((r) => r.distance_m),
+    /** Whether the leg's distance was fixed from a road route (then we may draw the road path). */
+    road: results.map((r) => r.polyline_key === "road"),
   };
 }
 
-function legInserts(db: D1Database, journeyId: string, route: RouteDraft) {
+/** Insert legs; `resolved[i]` (if given) fixes that leg's distance, otherwise great-circle. */
+function legInserts(db: D1Database, journeyId: string, route: RouteDraft, resolved: (ResolvedLeg | null)[] = []) {
   return draftToLegs(route).map((leg, seq) =>
     db
-      .prepare("INSERT INTO leg (journey_id, seq, from_place, to_place, mode, distance_m) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(journeyId, seq, route.stops[seq]!, route.stops[seq + 1]!, leg.mode, legDistanceM(leg)),
+      .prepare("INSERT INTO leg (journey_id, seq, from_place, to_place, mode, polyline_key, distance_m) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .bind(
+        journeyId, seq, route.stops[seq]!, route.stops[seq + 1]!, leg.mode,
+        resolved[seq]?.source === "road" ? "road" : null,
+        resolved[seq]?.distanceM ?? legDistanceM(leg),
+      ),
   );
+}
+
+/** Encoded road paths for drawing (null = straight). Only legs whose distance came from a road route. */
+async function routePaths(env: Env, route: StoredRoute): Promise<(string | null)[]> {
+  return Promise.all(route.modes.map((m, i) => (route.road[i] ? legPath(env, m, route.stops[i]!, route.stops[i + 1]!) : null)));
 }
 
 async function activeRow(db: D1Database, userId: string) {
@@ -109,7 +127,8 @@ async function unspentRefunds(db: D1Database, userId: string) {
   return { rows: results, total: results.reduce((s, r) => s + r.amount, 0) };
 }
 
-async function loadCurrent(db: D1Database, userId: string, currency: string) {
+async function loadCurrent(env: Env, userId: string, currency: string) {
+  const db = env.DB;
   const row = await activeRow(db, userId);
   if (!row) return null;
   const now = Date.now();
@@ -138,6 +157,7 @@ async function loadCurrent(db: D1Database, userId: string, currency: string) {
     traveler,
     wallet: wallet.results,
     refund: { pending: refund },
+    paths: await routePaths(env, route),
     state,
     serverTime: now,
   };
@@ -145,7 +165,7 @@ async function loadCurrent(db: D1Database, userId: string, currency: string) {
 
 export const journeys = new Hono<AppEnv>()
   .get("/current", async (c) => {
-    const journey = await loadCurrent(c.env.DB, c.var.user.id, c.var.user.homeCurrency ?? "KRW");
+    const journey = await loadCurrent(c.env, c.var.user.id, c.var.user.homeCurrency ?? "KRW");
     return c.json({ journey });
   })
 
@@ -174,6 +194,7 @@ export const journeys = new Hono<AppEnv>()
     const now = Date.now();
     const currency = user.homeCurrency ?? "KRW";
     const unspent = await unspentRefunds(db, user.id);
+    const resolved = await resolveRoute(c.env, parsed.draft.stops, parsed.draft.modes);
     const { carry, overflow } = carryOver(unspent.total, DEFAULT_STARTING_FUNDS);
     const txn = (type: string, amount: number, ref: string | null = null) =>
       db.prepare("INSERT INTO txn (id, journey_id, ts, type, currency, amount, ref_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
@@ -182,7 +203,7 @@ export const journeys = new Hono<AppEnv>()
       await db.batch([
         db.prepare("INSERT INTO journey (id, user_id, started_at, time_scale, status, created_at, last_seen_at) VALUES (?, ?, ?, 1, 'active', ?, ?)")
           .bind(id, user.id, now, now, now),
-        ...legInserts(db, id, parsed.draft),
+        ...legInserts(db, id, parsed.draft, resolved),
         db.prepare("INSERT INTO traveler (journey_id, name, stats_at) VALUES (?, ?, ?)").bind(id, name, now),
         db.prepare("INSERT INTO wallet (journey_id, currency, balance) VALUES (?, ?, ?)").bind(id, currency, base + carry),
         txn("starting_funds", base),
@@ -195,7 +216,7 @@ export const journeys = new Hono<AppEnv>()
       if (String(e).includes("UNIQUE")) return c.json({ error: "이미 진행 중인 여정이 있어요." }, 409);
       throw e;
     }
-    return c.json({ journey: await loadCurrent(db, user.id, currency), carry, overflow }, 201);
+    return c.json({ journey: await loadCurrent(c.env, user.id, currency), carry, overflow }, 201);
   })
 
   .put("/current/route", async (c) => {
@@ -205,13 +226,22 @@ export const journeys = new Hono<AppEnv>()
 
     const db = c.env.DB;
     const currency = c.var.user.homeCurrency ?? "KRW";
-    const current = await loadCurrent(db, c.var.user.id, currency);
+    const current = await loadCurrent(c.env, c.var.user.id, currency);
     if (!current || current.status !== "active") return c.json({ error: "진행 중인 여정이 없어요." }, 404);
     const lockError = checkRouteChange(current.route, parsed.draft, current.state.legIndex);
     if (lockError) return c.json({ error: lockError }, 409);
 
-    await db.batch([db.prepare("DELETE FROM leg WHERE journey_id = ?").bind(current.id), ...legInserts(db, current.id, parsed.draft)]);
-    return c.json({ journey: await loadCurrent(db, c.var.user.id, currency) });
+    // Locked legs (past + current) keep the distance fixed at departure so the position never jumps;
+    // only the new future legs are resolved.
+    const locked = current.state.legIndex + 1;
+    const future = await resolveRoute(c.env, parsed.draft.stops.slice(locked), parsed.draft.modes.slice(locked));
+    const resolved: (ResolvedLeg | null)[] = parsed.draft.modes.map((_, i) =>
+      i < locked
+      ? { distanceM: current.route.distances[i]!, path: null, source: current.route.road[i] ? "road" : "direct" }
+      : future[i - locked]!,
+    );
+    await db.batch([db.prepare("DELETE FROM leg WHERE journey_id = ?").bind(current.id), ...legInserts(db, current.id, parsed.draft, resolved)]);
+    return c.json({ journey: await loadCurrent(c.env, c.var.user.id, currency) });
   })
 
   .post("/current/abandon", async (c) => {
@@ -225,6 +255,15 @@ export const journeys = new Hono<AppEnv>()
     await settle(db, row.id, currency, false, now);
     await db.prepare("UPDATE journey SET status = 'abandoned' WHERE id = ?").bind(row.id).run();
     return c.json({ ok: true });
+  })
+
+  /** Road distances/paths for a draft (editor preview). Cached per leg in KV. */
+  .post("/resolve", async (c) => {
+    const body = await c.req.json<{ route?: unknown }>().catch(() => null);
+    const parsed = parseRouteDraft(body?.route);
+    if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+    const legs = await resolveRoute(c.env, parsed.draft.stops, parsed.draft.modes);
+    return c.json({ legs });
   })
 
   .get("/current/quests", async (c) => {

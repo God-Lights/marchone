@@ -9,6 +9,9 @@ const app = new Hono<AppEnv>();
 
 app.get("/api/health", (c) => c.json({ ok: true, service: "marchone", time: Date.now() }));
 
+// Public client config. The browser key is referrer-restricted in Google Cloud, so exposing it is expected.
+app.get("/api/config", (c) => c.json({ mapsBrowserKey: c.env.GOOGLE_MAPS_BROWSER_KEY || null }));
+
 // Better Auth handles /api/auth/* (anonymous sign-in, passkeys, sessions).
 app.use("/api/*", async (c, next) => {
   c.set("auth", createAuth(c.env, c.req.raw));
