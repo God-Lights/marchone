@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { authClient } from "./auth";
+import { GL_LOGIN_PATH } from "./api";
 
-export function Welcome({ onSignedIn }: { onSignedIn: () => void }) {
+export function Welcome({ onSignedIn, notice }: { onSignedIn: () => void; notice?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,11 +23,14 @@ export function Welcome({ onSignedIn }: { onSignedIn: () => void }) {
   return (
     <section className="card welcome">
       <p className="lead">작은 여행자 <strong>마치</strong>가 당신 대신 세계를 걸어요.</p>
-      <p className="muted">가입 없이 바로 시작할 수 있어요. 나중에 패스키를 등록하면 다른 기기에서도 이어서 볼 수 있어요.</p>
-      <button className="primary" disabled={busy} onClick={() => run(() => authClient.signIn.anonymous())}>
-        바로 시작하기
+      {notice && <p className="muted" role="status">{notice}</p>}
+      {/* A plain link: GL login starts only when the user presses this. */}
+      <a className="button primary" href={GL_LOGIN_PATH}>GL 계정으로 로그인</a>
+      <button disabled={busy} onClick={() => run(() => authClient.signIn.anonymous())}>
+        로그인 없이 시작하기
       </button>
-      <button disabled={busy} onClick={() => run(() => authClient.signIn.passkey())}>
+      <p className="muted">로그인 없이 시작해도 나중에 GL 계정으로 로그인하면 여정이 그대로 이어져요.</p>
+      <button className="ghost" disabled={busy} onClick={() => run(() => authClient.signIn.passkey())}>
         패스키로 이어하기
       </button>
       {error && <p className="issue error" role="alert">{error}</p>}

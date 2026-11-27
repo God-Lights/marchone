@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { decodePolyline, journeyState, localParts, pointAlong } from "@marchone/engine";
-import type { Journey, Me } from "./api";
+import { GL_LOGIN_PATH, type Journey, type Me } from "./api";
 import { authClient } from "./auth";
 import { QuestPanel } from "./QuestPanel";
 import { JourneyMap } from "./maps/JourneyMap";
@@ -77,11 +77,12 @@ export function JourneyView({
         <QuestPanel currency={me.user.homeCurrency} refreshKey={s.legIndex} />
       )}
 
-      {me.user.isAnonymous && me.passkeys === 0 && (
-        <section className="card">
+      {!me.gl && me.user.isAnonymous && me.passkeys === 0 && (
+        <section className="card guard">
           <h2>여정 지키기</h2>
-          <p className="muted">지금은 이 브라우저에만 로그인돼 있어요. 패스키를 등록하면 다른 기기에서도 {name}를 만날 수 있어요.</p>
-          <button onClick={addPasskey}>패스키 등록</button>
+          <p className="muted">지금은 이 브라우저에만 저장돼 있어요. GL 계정으로 로그인하면 이 여정이 계정에 이어지고, 다른 기기에서도 {name}를 만날 수 있어요.</p>
+          <a className="button" href={GL_LOGIN_PATH}>GL 계정으로 로그인</a>
+          <button className="ghost" onClick={addPasskey}>대신 이 기기에 패스키 등록</button>
           {msg && <p className="muted" role="status">{msg}</p>}
         </section>
       )}

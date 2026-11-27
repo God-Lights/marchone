@@ -42,7 +42,14 @@ data/              카탈로그 시드 JSON
 - 로컬 테스트: `.dev.vars`에 `GOOGLE_ROUTES_ENDPOINT`로 Routes API 주소를 바꿀 수 있음.
 
 ## 인증
-Better Auth(D1) — **게스트(익명)로 바로 시작** → **패스키 등록**으로 계정 보존·다른 기기 로그인.
+- **GL Account (주 로그인)** — `*.officialgl.com` 쿠키 방식. GL이 발급한 `gl_session`(Domain=.officialgl.com)을
+  서버에서 `POST {GL_ACCOUNT_ORIGIN}/api/internal/verify-session`으로 검증(Worker 시크릿 `GL_ACCOUNT_KEY`, 30초 캐시).
+  - 로그인은 사용자가 버튼을 눌러야만 시작: `GET /auth/login` → `https://account.officialgl.com/?return=https%3A%2F%2Fmarchone.officialgl.com%2F`.
+    페이지 열기·401·로그아웃으로 자동 이동하지 않음.
+  - 사용자 식별은 GL `user.id`만 사용(`gl_link` 테이블로 MarchOne 계정과 1:1 연결). 이 기기의 게스트/패스키 계정이 있으면 첫 GL 로그인 때 그 계정과 여정을 이어받음.
+  - `POST /auth/logout`: MarchOne에서만 로그아웃(GL 로그인 상태는 그대로). `mo_gl_off` 쿠키로 다시 로그인 버튼을 누를 때까지 `gl_session`을 무시.
+  - GL 쿠키는 모든 `*.officialgl.com`에 전송되므로, 상태를 바꾸는 API는 우리 Origin에서 온 요청만 허용.
+- **게스트 / 패스키** — Better Auth(D1). 로그인 없이 시작(버튼), 기존 패스키 사용자 로그인 유지.
 스키마 변경 시 `node --experimental-strip-types scripts/auth-schema.mjs`로 필요한 SQL을 출력해 새 마이그레이션에 반영.
 
 ## API
