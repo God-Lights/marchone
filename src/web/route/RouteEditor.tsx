@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { RouteDraft } from "@marchone/engine";
 import {
   ALL_MODES, ROUTE_TEMPLATES, addStop, moveStop, normalizeDraft, placeById, removeStop,
   searchPlaces, setMode, summarizeRoute, validateRoute, MAX_STOPS,
@@ -7,8 +8,21 @@ import { useRouteDraft } from "./useRouteDraft";
 import { RouteMap } from "./RouteMap";
 import { MODE_META, formatDate, formatDuration, formatKm } from "./format";
 
-export function RouteEditor() {
+export function RouteEditor({ onStart }: { onStart: (draft: RouteDraft) => Promise<void> }) {
   const [draft, setDraft] = useRouteDraft();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  async function start() {
+    setStarting(true);
+    setStartError(null);
+    try {
+      await onStart(draft);
+    } catch (e) {
+      setStartError(e instanceof Error ? e.message : "출발하지 못했어요.");
+      setStarting(false);
+    }
+  }
   const [query, setQuery] = useState("");
   const [selectedLeg, setSelectedLeg] = useState<number | null>(null);
 
@@ -124,8 +138,9 @@ export function RouteEditor() {
         </div>
       </section>
 
-      <button className="primary" disabled={hasError || draft.stops.length < 2} title="여정 저장 API 연결 후 활성화돼요">
-        이 루트로 출발 (준비 중)
+      {startError && <p className="issue error" role="alert">{startError}</p>}
+      <button className="primary" disabled={hasError || draft.stops.length < 2 || starting} onClick={() => void start()}>
+        {starting ? "출발 준비 중…" : "이 루트로 출발"}
       </button>
     </div>
   );

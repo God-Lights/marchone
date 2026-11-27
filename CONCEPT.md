@@ -121,7 +121,7 @@
 | 런타임 | 단일 Worker (Hono + Static Assets), PWA |
 | DB | D1 + Drizzle |
 | 캐시/파일 | KV / R2 |
-| 인증 | Better Auth (이메일 매직링크 + 패스키) |
+| 인증 | Better Auth: 게스트(익명) 즉시 시작 + 패스키로 계정 보존 (이메일 발송 인프라 불필요) |
 | 푸시 | Web Push (VAPID), Cron `*/5` + `next_notify_at` |
 | 타임존 | `tz-lookup` + `Intl` (`geo-tz`는 번들 과대) |
 | 날씨 | Open-Meteo → KV 캐시 |

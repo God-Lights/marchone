@@ -33,4 +33,19 @@ data/              카탈로그 시드 JSON
    - `CLOUDFLARE_ACCOUNT_ID`
 2. `officialgl.com`이 같은 Cloudflare 계정의 존이어야 함 (커스텀 도메인 `marchone.officialgl.com`은 배포 시 자동 생성).
 3. (선택) GitHub Environment `production` 생성 후 승인 규칙 추가.
-4. 시크릿: `npx wrangler secret put GOOGLE_MAPS_SERVER_KEY`
+4. `BETTER_AUTH_SECRET`(32자 이상 랜덤 문자열)을 GitHub Actions 시크릿에 추가 → 배포 시 Worker 시크릿으로 함께 업로드됨
+5. 시크릿: `npx wrangler secret put GOOGLE_MAPS_SERVER_KEY`
+
+## 인증
+Better Auth(D1) — **게스트(익명)로 바로 시작** → **패스키 등록**으로 계정 보존·다른 기기 로그인.
+스키마 변경 시 `node --experimental-strip-types scripts/auth-schema.mjs`로 필요한 SQL을 출력해 새 마이그레이션에 반영.
+
+## API
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| * | `/api/auth/*` | Better Auth (익명 로그인, 패스키, 세션) |
+| GET | `/api/me` | 내 계정 |
+| GET | `/api/journeys/current` | 진행 중 여정 + 현재 상태(엔진 계산) |
+| POST | `/api/journeys` | `{ route, travelerName? }`로 출발 |
+| PUT | `/api/journeys/current/route` | 앞으로 갈 구간만 수정 |
+| POST | `/api/journeys/current/abandon` | 여정 그만두기 |

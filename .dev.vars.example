@@ -1,1 +1,3 @@
+# Optional locally (a dev secret is used on localhost). Required in production.
+BETTER_AUTH_SECRET=
 GOOGLE_MAPS_SERVER_KEY=
